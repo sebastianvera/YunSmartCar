@@ -18,9 +18,19 @@
 #include <Bridge.h>
 #include <YunServer.h>
 #include <YunClient.h>
+#include <LiquidCrystal.h>
+
+
+//Liquid Crystal Settings
+const int RS = 4;
+const int E = 8;
+const int D4 = 3;
+const int D5 = 12;
+const int D6 = 11;
+const int D7 = 13;
+LiquidCrystal lcd(RS, E, D4, D5, D6, D7);
 
 // Global variables
-
 YunServer server;
 boolean isGoingForward = false;
 int status = 0;
@@ -42,29 +52,37 @@ const int backThreshold = 100;
 float frontDiff = 25;
 float backDiff = 4;
 float buzzerFrequencyInSeconds = 1;
+String ip;
 
 void setup() {
-  pinMode(13, OUTPUT);
-  digitalWrite(13, LOW);
-
   pinMode(RF, OUTPUT);
   pinMode(RB, OUTPUT);
   pinMode(LF, OUTPUT);
   pinMode(LB, OUTPUT);
-
+  
+  
   // Bridge startup
   Bridge.begin();
+  ip = getIP();
+  
+  lcd.begin(16, 2);
+  lcd.print(ip);
+  
   Serial.begin(9600);
-  digitalWrite(13, HIGH);
+  Serial.println(ip);
   // Listen for incoming connection only from localhost
   // (no one from the external network could connect)
   server.listenOnLocalhost();
   server.begin();
   Serial.println("Server running");
+    // Print IP
+  makeNoise();
+  makeNoise();
+  delay(3000);
+  Serial.println(ip);
 }
 
 void loop() {
-
   if (timeout > 3) // 0.150 seconds
   {
     halt();
@@ -74,7 +92,6 @@ void loop() {
   if (timeout > 100) {
     timeout = 11;
   }
-
   processRequest();
   if (isGoingForward)
     measureFrontDistance();
@@ -93,12 +110,10 @@ void processRequest() {
   // There is a new client?
   if (client) {
     Serial.println("Incoming request.");
-    digitalWrite(13, LOW);
     // Process request
     process(client);
     // Close connection and free resources.
     client.stop();
-    digitalWrite(13, HIGH);
   } else {
     timeout += 1;
   }
@@ -183,7 +198,7 @@ void left(String mode) {
     if (isGoingForward)
       digitalWrite(RF, slow);
     else
-      digitalWrite(RB, slow);
+      digitalWrite(RB, slow+30);
   }
 }
 
@@ -196,11 +211,9 @@ void right(String mode) {
   } else {
     if (isGoingForward){
       digitalWrite(LF, slow);
-      Serial.println("adelante");
     }
     else {
-      digitalWrite(LB, slow);
-      Serial.println("atras");
+      digitalWrite(LB, slow + 30);
     }
   }
 }
@@ -290,5 +303,5 @@ void measureBackDistance() {
 }
 
 void makeNoise() {
-  tone(buzzerPin, 131, 100);
+//  tone(buzzerPin, 131, 100);
 }
