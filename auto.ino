@@ -23,12 +23,12 @@
 // will forward there all the HTTP requests for us.
 YunServer server;
 boolean isGoingForward = false;
-int RF = 10;
-int RB = 9;
-int LF = 6;
-int LB = 5;
-int fast = 255; // 255
-int slow = 150;
+const int RF = 10;
+const int RB = 9;
+const int LF = 6;
+const int LB = 5;
+const int fast = 255; // 255
+const int slow = 150;
 String lastRequest;
 boolean firstTime;
 int timeout;
@@ -39,15 +39,12 @@ const int buzzerPin = 3;
 int frontThreshold = 100;
 float frontDiff = 25;
 float buzzerFrequencyInSeconds = 1;
-
 void setup() {
   firstTime = true;
   timeout = 0;
   pinMode(13, OUTPUT);
   digitalWrite(13, LOW);
- 
-  pinMode(buzzerPin, OUTPUT);
-  // Motor's pin
+
   pinMode(RF, OUTPUT);
   pinMode(RB, OUTPUT);
   pinMode(LF, OUTPUT);
@@ -90,7 +87,6 @@ void loop() {
   } else {
     timeout += 1;
   }
-  // Sensors logic with buzzer
   long frontPingDistance = getDistance(fontPing);
   if (frontPingDistance - frontDiff <= frontThreshold) {
     // Start sensor
@@ -109,8 +105,7 @@ void loop() {
   } else {
     count++;
   }
-  
-  delay(50);
+  delay(50); // Poll every 50ms
 }
 
 void process(YunClient client) {
@@ -122,7 +117,7 @@ void process(YunClient client) {
   if (mode == lastRequest) {
     return;
   }
-  
+
   halt();
 
   // process the request
