@@ -19,29 +19,31 @@
 #include <YunServer.h>
 #include <YunClient.h>
 
-// Listen on default port 5555, the webserver on the Yun
-// will forward there all the HTTP requests for us.
+// Global variables
+
 YunServer server;
 boolean isGoingForward = false;
+int status = 0;
 const int RF = 10;
 const int RB = 9;
 const int LF = 6;
 const int LB = 5;
 const int fast = 255; // 255
 const int slow = 150;
-String lastRequest;
-boolean firstTime;
-int timeout;
-bool on = false;
+boolean firstTime = true;
+int timeout = 0;
+boolean on = false;
 int count = 0;
-const int fontPing = 7;
-const int buzzerPin = 3;
-int frontThreshold = 100;
+const int frontPing = 7;
+const int backPing = 4;
+const int buzzerPin = 2;
+const int frontThreshold = 100;
+const int backThreshold = 100;
 float frontDiff = 25;
+float backDiff = 4;
 float buzzerFrequencyInSeconds = 1;
+
 void setup() {
-  firstTime = true;
-  timeout = 0;
   pinMode(13, OUTPUT);
   digitalWrite(13, LOW);
 
@@ -63,7 +65,7 @@ void setup() {
 
 void loop() {
 
-  if (timeout > 10) // 0.5 seconds
+  if (timeout > 3) // 0.150 seconds
   {
     halt();
     firstTime = true;
@@ -73,6 +75,19 @@ void loop() {
     timeout = 11;
   }
 
+  processRequest();
+  if (isGoingForward)
+    measureFrontDistance();
+  else
+    measureBackDistance();
+  delay(50); // Poll every 50ms
+}
+
+// ******************************************
+// *                Functions               *
+// ******************************************
+
+void processRequest() {
   // Get clients coming from server
   YunClient client = server.accept();
   // There is a new client?
@@ -87,36 +102,15 @@ void loop() {
   } else {
     timeout += 1;
   }
-  long frontPingDistance = getDistance(fontPing);
-  if (frontPingDistance - frontDiff <= frontThreshold) {
-    // Start sensor
-    if (!on) 
-      count = 0;
-    on = true;
-    buzzerFrequencyInSeconds = ((float)frontPingDistance - frontDiff)/(float)frontThreshold;
-  }else{
-    on = false;
-    buzzerFrequencyInSeconds = 1;
-  }
-  
-  if (on && count >= frequency()) {
-    tone(3, 131, 100);
-    count = 0;
-  } else {
-    count++;
-  }
-  delay(50); // Poll every 50ms
 }
 
 void process(YunClient client) {
+  Serial.print("Before request - Status: "); // Debugging
+  Serial.println(status);// Debugging
   timeout = 0;
   // read the command from URL
   String command = client.readStringUntil('/');
   String mode = client.readStringUntil('\r');
-
-  if (mode == lastRequest) {
-    return;
-  }
 
   halt();
 
@@ -136,6 +130,8 @@ void process(YunClient client) {
     right(mode);
   }
   client.print(isGoingForward);
+  Serial.print("After request - Status: "); // Debugging
+  Serial.println(status);// Debugging
 }
 
 void forward(String mode) {
@@ -143,19 +139,14 @@ void forward(String mode) {
     isGoingForward = true;
     firstTime = false;
   }
-  // Check if needs to halt
-  if (!isGoingForward) {
-    isGoingForward = true;
-    halt();
-    Serial.println("Frenar : Iba en reversa");
-    return;
-  }
+
+  status = 1;
   if (mode == "fast") {
-    analogWrite(RF, fast);
-    analogWrite(LF, fast);
+    analogWrite(RF, fast-30);
+    analogWrite(LF, fast-30);
   } else {
-    analogWrite(RF, slow);
-    analogWrite(LF, slow);
+    analogWrite(RF, slow-30);
+    analogWrite(LF, slow-30);
   }
 }
 
@@ -168,10 +159,11 @@ void backward(String mode) {
   if (isGoingForward) {
     halt();
     isGoingForward = false;
+    status = 0;
     Serial.println("Frenar : Iba hacia adelante");
     return;
   }
-
+  status = -1;
   if (mode == "fast") {
     analogWrite(RB, fast);
     analogWrite(LB, fast);
@@ -183,21 +175,34 @@ void backward(String mode) {
 
 void left(String mode) {
   if (mode == "fast") {
-    // Go fast
+    if (isGoingForward)
+      digitalWrite(RF, fast);
+    else
+      digitalWrite(RB, fast);
   } else {
-    // Go slow
+    if (isGoingForward)
+      digitalWrite(RF, slow);
+    else
+      digitalWrite(RB, slow);
   }
-  digitalWrite(RF, HIGH);
-//  digitalWrite(LB, HIGH);
 }
 
 void right(String mode) {
   if (mode == "fast") {
+    if (isGoingForward)
+      digitalWrite(LF, fast);
+    else
+      digitalWrite(LB, fast);
   } else {
+    if (isGoingForward){
+      digitalWrite(LF, slow);
+      Serial.println("adelante");
+    }
+    else {
+      digitalWrite(LB, slow);
+      Serial.println("atras");
+    }
   }
-
-  digitalWrite(LF, HIGH);
-//  digitalWrite(RB, HIGH);
 }
 
 void halt() {
@@ -238,4 +243,52 @@ long getDistance(int pingPin) {
 long microsecondsToCentimeters(long microseconds)
 {
   return microseconds / 29 / 2;
+}
+
+void measureFrontDistance() {
+  long frontPingDistance = getDistance(frontPing);
+  if (frontPingDistance - frontDiff <= frontThreshold) {
+    // Start sensor
+    if (!on) 
+      count = 0;
+    on = true;
+    buzzerFrequencyInSeconds = ((float)frontPingDistance - frontDiff)/(float)frontThreshold;
+  }else{
+    on = false;
+    buzzerFrequencyInSeconds = 1;
+  }
+  
+  if (on && count >= frequency()) {
+    Serial.println("PI!!!! FRONT");
+    makeNoise();
+    count = 0;
+  } else {
+    count++;
+  }
+}
+
+void measureBackDistance() {
+  long backPingDistance = getDistance(backPing);
+  if (backPingDistance - backDiff <= backThreshold) {
+    // Start sensor
+    if (!on) 
+      count = 0;
+    on = true;
+    buzzerFrequencyInSeconds = ((float)backPingDistance - backDiff)/(float)backThreshold;
+  }else{
+    on = false;
+    buzzerFrequencyInSeconds = 1;
+  }
+  
+  if (on && count >= frequency()) {
+    Serial.println("PI!!!! BACK");
+    makeNoise();
+    count = 0;
+  } else {
+    count++;
+  }
+}
+
+void makeNoise() {
+  tone(buzzerPin, 131, 100);
 }
